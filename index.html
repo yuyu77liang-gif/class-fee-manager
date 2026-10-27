@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>班級代辦費與收費管理系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-print-mode="summary">
+  <!-- 螢幕操作介面 -->
+  <div class="app-container no-print">
+    <!-- 頂部導覽與統計區 -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-badge">CLASS TREASURY</div>
+        <div class="title-wrapper">
+          <input type="text" id="class-title-input" class="class-title-input" value="二年一班 代辦費與收費管理" placeholder="輸入班級或學期名稱..." title="點擊修改班級與表單標題">
+          <span class="edit-hint">✎ 點擊可改名</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="btn-demo-data" class="btn btn-ghost" title="載入範例班級與收費項目">載入範例資料</button>
+        <button type="button" id="btn-export-json" class="btn btn-outline" title="匯出備份檔">匯出備份</button>
+        <label class="btn btn-outline file-label" title="匯入備份檔">
+          匯入備份
+          <input type="file" id="input-import-json" accept=".json" hidden>
+        </label>
+        <button type="button" id="btn-clear-all" class="btn btn-danger-ghost" title="清空所有資料">重置系統</button>
+        <button type="button" id="btn-export-excel" class="btn btn-excel btn-lg" title="匯出完整收費明細與結算表 (Excel / CSV)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="8" y1="13" x2="16" y2="17"></line>
+            <line x1="16" y1="13" x2="8" y2="17"></line>
+          </svg>
+          匯出 Excel 結算表
+        </button>
+        <button type="button" id="btn-print-slips" class="btn btn-secondary btn-lg" title="產生一頁 6 格可裁剪貼在聯絡簿上的個人收費通知單">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="9" rx="1"></rect>
+            <rect x="3" y="15" width="7" height="6" rx="1"></rect>
+            <rect x="14" y="15" width="7" height="6" rx="1"></rect>
+          </svg>
+          列印聯絡簿明細
+        </button>
+        <button type="button" id="btn-print" class="btn btn-primary btn-lg" title="產生全班 A4 總表供老師或總務點收打勾">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          列印收費明細表 (A4)
+        </button>
+      </div>
+    </header>
+
+    <!-- 即時總覽儀表板 -->
+    <section class="summary-cards">
+      <div class="stat-card">
+        <div class="stat-label">應收總金額</div>
+        <div class="stat-value" id="stat-total-expected">$0</div>
+        <div class="stat-meta" id="stat-items-count">共 0 個收費項目</div>
+      </div>
+      <div class="stat-card stat-card-success">
+        <div class="stat-label">已收金額</div>
+        <div class="stat-value" id="stat-total-collected">$0</div>
+        <div class="stat-meta" id="stat-paid-students">0 / 0 人已繳清</div>
+      </div>
+      <div class="stat-card stat-card-warning">
+        <div class="stat-label">待收餘額</div>
+        <div class="stat-value" id="stat-total-unpaid">$0</div>
+        <div class="stat-meta" id="stat-unpaid-students">尚有 0 人未繳</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">收齊進度</div>
+        <div class="stat-value" id="stat-progress-percent">0%</div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="stat-progress-bar" style="width: 0%"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 主內容區：雙欄設計 -->
+    <main class="main-grid">
+      <!-- 左側：名單管理 + 收費項目管理 -->
+      <div class="left-column">
+        <!-- 1. 班級名單管理 -->
+        <section class="panel" id="panel-students">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">1. 班級名單管理</h2>
+              <p class="panel-subtitle">收費紀錄綁定學生專屬唯一 ID，修改座號或遞補重編絕不影響原本帳務明細</p>
+            </div>
+            <div class="panel-header-actions">
+              <button type="button" id="btn-renumber-seats" class="btn btn-outline btn-sm" title="將目前名單依序重編為 01, 02, 03...（適合同學轉出後往前遞補座號）">
+                🔢 重新整理座號
+              </button>
+              <span class="badge" id="student-count-badge">0 人</span>
+            </div>
+          </div>
+
+          <form id="form-add-student" class="quick-add-form">
+            <input type="text" id="input-student-seat" class="input input-seat" placeholder="座號 (選填)">
+            <input type="text" id="input-student-name" class="input input-name" placeholder="輸入學生姓名 (按 Enter 快速新增)" required>
+            <button type="submit" class="btn btn-secondary">＋ 新增</button>
+            <button type="button" id="btn-toggle-bulk" class="btn btn-ghost">批次貼上</button>
+          </form>
+
+          <!-- 批次新增抽屜 -->
+          <div id="bulk-add-drawer" class="bulk-drawer hidden">
+            <label for="textarea-bulk-students" class="form-label">批次輸入名單（每行一位，或用逗號分隔，例如：<code>01 王小明</code> 或 <code>陳小華</code>）</label>
+            <textarea id="textarea-bulk-students" class="textarea" rows="4" placeholder="01 王小明&#10;02 林小美&#10;03 張大華"></textarea>
+            <div class="bulk-actions">
+              <button type="button" id="btn-cancel-bulk" class="btn btn-ghost btn-sm">取消</button>
+              <button type="button" id="btn-confirm-bulk" class="btn btn-primary btn-sm">確認匯入名單</button>
+            </div>
+          </div>
+
+          <!-- 學生名單列表（支援編輯座號與姓名、刪除，依座號自動排序） -->
+          <div id="student-chips-container" class="student-chips-container">
+            <!-- JS 動態渲染 -->
+          </div>
+        </section>
+
+        <!-- 2. 新增與管理收費項目 -->
+        <section class="panel" id="panel-expenses">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">2. 新增收費項目</h2>
+              <p class="panel-subtitle">記錄集體花費並設定分攤方式，自動計算每人應繳金額</p>
+            </div>
+          </div>
+
+          <form id="form-add-expense" class="expense-form">
+            <div class="form-row">
+              <div class="form-group flex-2">
+                <label for="input-expense-title" class="form-label">收費項目名稱 <span class="required">*</span></label>
+                <input type="text" id="input-expense-title" class="input" placeholder="例如：生物講義、週五訂便當、班服製作" required>
+              </div>
+              <div class="form-group flex-1">
+                <label for="input-expense-amount" class="form-label" id="label-expense-amount">項目總金額 ($) <span class="required">*</span></label>
+                <input type="number" id="input-expense-amount" class="input" placeholder="例如：3000" min="0" step="1" required>
+              </div>
+            </div>
+
+            <!-- 分攤模式選擇 -->
+            <div class="form-group">
+              <label class="form-label">分攤模式</label>
+              <div class="mode-tabs" role="radiogroup">
+                <label class="mode-tab active" data-mode="all_equal">
+                  <input type="radio" name="split_mode" value="all_equal" checked>
+                  <span class="mode-tab-title">全班平分</span>
+                  <span class="mode-tab-desc">總金額 ÷ 全班人數</span>
+                </label>
+                <label class="mode-tab" data-mode="selected_equal">
+                  <input type="radio" name="split_mode" value="selected_equal">
+                  <span class="mode-tab-title">指定同學平分 / 定額</span>
+                  <span class="mode-tab-desc">勾選參與的同學分攤</span>
+                </label>
+                <label class="mode-tab" data-mode="custom_individual">
+                  <input type="radio" name="split_mode" value="custom_individual">
+                  <span class="mode-tab-title">指定同學各自付費</span>
+                  <span class="mode-tab-desc">如訂便當、不同尺寸班服</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 模式 A：全班平分預覽 -->
+            <div id="split-preview-all" class="split-config-box">
+              <div class="split-info-row">
+                <span>計算方式：輸入總金額自動由全班同學平均分攤（四捨五入至整數）</span>
+                <strong id="all-equal-preview-text" class="highlight-amount">每人應繳 $0</strong>
+              </div>
+            </div>
+
+            <!-- 模式 B：指定同學平分 / 定額 -->
+            <div id="split-config-selected" class="split-config-box hidden">
+              <div class="sub-mode-bar">
+                <div class="sub-mode-radios">
+                  <label class="radio-inline">
+                    <input type="radio" name="selected_calc_type" value="by_total" checked>
+                    輸入「總金額」由勾選者平分
+                  </label>
+                  <label class="radio-inline">
+                    <input type="radio" name="selected_calc_type" value="by_unit">
+                    輸入「每人單價」乘以勾選人數
+                  </label>
+                </div>
+                <div class="selection-quick-btns">
+                  <button type="button" class="btn-link" id="btn-select-all-students">全選</button>
+                  <button type="button" class="btn-link" id="btn-deselect-all-students">全不選</button>
+                </div>
+              </div>
+              <div id="selected-students-grid" class="student-check-grid">
+                <!-- JS 動態生成學生勾選清單 -->
+              </div>
+              <div class="split-info-row">
+                <span id="selected-count-text">已勾選 0 人</span>
+                <strong id="selected-equal-preview-text" class="highlight-amount">每人應繳 $0</strong>
+              </div>
+            </div>
+
+            <!-- 模式 C：指定同學各自付費 -->
+            <div id="split-config-custom" class="split-config-box hidden">
+              <div class="sub-mode-bar">
+                <span class="text-sm text-muted">請在有參與的同學欄位輸入個人應繳金額（未購買者留空或填 0）：</span>
+                <div class="quick-fill-group">
+                  <input type="number" id="input-quick-fill-amount" class="input input-sm" placeholder="快速填入金額">
+                  <button type="button" id="btn-quick-fill-all" class="btn btn-outline btn-sm">填入全部</button>
+                  <button type="button" id="btn-clear-custom-amounts" class="btn btn-ghost btn-sm">清空</button>
+                </div>
+              </div>
+              <div id="custom-students-grid" class="custom-amount-grid">
+                <!-- JS 動態生成各自付費輸入框 -->
+              </div>
+              <div class="split-info-row">
+                <span id="custom-participants-text">共 0 人參與</span>
+                <strong id="custom-total-preview-text" class="highlight-amount">合計總金額：$0</strong>
+              </div>
+            </div>
+
+            <div class="form-submit-row">
+              <button type="button" id="btn-cancel-edit-expense" class="btn btn-ghost hidden">取消編輯</button>
+              <button type="submit" id="btn-submit-expense" class="btn btn-primary">＋ 加入收費項目</button>
+            </div>
+          </form>
+
+          <!-- 已建立的收費項目列表 -->
+          <div class="expense-list-wrapper">
+            <div class="section-divider">
+              <span>已登錄的收費項目清單</span>
+              <span id="expense-list-summary" class="text-muted text-sm">共 0 筆</span>
+            </div>
+            <div id="expense-items-container" class="expense-items-container">
+              <!-- JS 動態渲染 -->
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右側：繳費總覽與打勾點收 -->
+      <div class="right-column">
+        <section class="panel panel-sticky" id="panel-collection">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">3. 繳費總覽與打勾點收</h2>
+              <p class="panel-subtitle">自動依座號由小到大排序；點擊列或打勾即可標記「已繳費」</p>
+            </div>
+            <div class="collection-header-tools">
+              <button type="button" id="btn-mark-all-paid" class="btn btn-outline btn-sm">全部標為已繳</button>
+              <button type="button" id="btn-mark-all-unpaid" class="btn btn-ghost btn-sm">全部重置未繳</button>
+            </div>
+          </div>
+
+          <!-- 篩選與搜尋列 -->
+          <div class="filter-bar">
+            <div class="filter-tabs">
+              <button type="button" class="filter-tab active" data-filter="all">全部 (<span id="count-all">0</span>)</button>
+              <button type="button" class="filter-tab" data-filter="unpaid">未繳費 (<span id="count-unpaid">0</span>)</button>
+              <button type="button" class="filter-tab" data-filter="paid">已繳費 (<span id="count-paid">0</span>)</button>
+            </div>
+            <div class="search-box">
+              <input type="text" id="input-search-student" class="input input-sm" placeholder="搜尋姓名或座號...">
+            </div>
+          </div>
+
+          <!-- 學生收費點收表格 -->
+          <div class="table-responsive">
+            <table class="collection-table">
+              <thead>
+                <tr>
+                  <th class="col-check">點收狀態</th>
+                  <th class="col-student">座號 / 姓名</th>
+                  <th class="col-breakdown">個人花費項目明細</th>
+                  <th class="col-total">應繳總額</th>
+                </tr>
+              </thead>
+              <tbody id="collection-table-body">
+                <!-- JS 動態渲染 -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- =========================================================
+       列印模式一：全班 A4 收費明細總表 (data-print-mode="summary")
+       ========================================================= -->
+  <section class="print-sheet print-summary-sheet" id="print-sheet">
+    <div class="print-header">
+      <div class="print-title-block">
+        <h1 id="print-class-title">二年一班 代辦費與收費明細表</h1>
+        <p class="print-subtitle">請同學核對個人花費項目明細與應繳總金額，並於繳費時交由老師或總務股長點收打勾。</p>
+      </div>
+      <div class="print-meta-block">
+        <div>製表日期：<span id="print-date"></span></div>
+        <div>應收總計：<strong id="print-total-expected">$0</strong></div>
+        <div>已收 / 待收：<span id="print-collected-status">$0 / $0</span></div>
+      </div>
+    </div>
+
+    <!-- 收費項目摘要小表 -->
+    <div class="print-expense-summary" id="print-expense-summary">
+      <!-- JS 動態渲染各收費項目概覽 -->
+    </div>
+
+    <!-- 學生個人明細與簽收大表 -->
+    <table class="print-table">
+      <thead>
+        <tr>
+          <th class="p-col-seat">座號</th>
+          <th class="p-col-name">姓名</th>
+          <th class="p-col-details">個人花費項目明細</th>
+          <th class="p-col-total">應繳總金額</th>
+          <th class="p-col-status">繳費點收 / 簽名</th>
+        </tr>
+      </thead>
+      <tbody id="print-table-body">
+        <!-- JS 動態渲染 -->
+      </tbody>
+    </table>
+
+    <div class="print-footer">
+      <div>導師簽章：________________________</div>
+      <div>總務股長：________________________</div>
+      <div>結算紀錄：<span id="print-footer-stats"></span></div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       列印模式二：聯絡簿個人收費通知單 (一頁 A4 印 6 張，適合裁剪貼聯絡簿)
+       ========================================================= -->
+  <section class="print-slips-sheet" id="print-slips-sheet">
+    <div class="slips-grid" id="print-slips-container">
+      <!-- JS 動態針對每位學生產生獨立小收費單 -->
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
